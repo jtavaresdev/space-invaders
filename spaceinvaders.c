@@ -1,6 +1,9 @@
 #include "spaceinvaders.h"
 #include <allegro5/allegro_primitives.h>
 #include <allegro5/allegro_image.h>
+#include <allegro5/allegro_font.h>
+#include <allegro5/allegro_audio.h>
+#include <allegro5/allegro_acodec.h>
 #include <math.h>
 #include <stdio.h>
 #define LARGURA_TELA 800
@@ -8,24 +11,62 @@
 
 ALLEGRO_BITMAP *jogador_img = NULL;
 ALLEGRO_BITMAP *inimigo_img = NULL;
+ALLEGRO_FONT *fonte = NULL;
+ALLEGRO_SAMPLE *musica_fundo = NULL;
+ALLEGRO_SAMPLE *som_tiro = NULL;
+ALLEGRO_SAMPLE *som_explosao = NULL;
+ALLEGRO_SAMPLE_INSTANCE *instancia_musica = NULL;
 
+int recorde = 0;
 
 bool inicializar_jogo(Jogador *jogador, Inimigo inimigos[], int num_inimigos){
 	
 	jogador->x = LARGURA_TELA / 2;
 	jogador->y = ALTURA_TELA - 50;
 	jogador->vidas = 3;
+	jogador->pontuacao = 0;
 	
 	for (int i = 0; i < num_inimigos; i ++){
 		// inimigos na mesma 'linha'
-		inimigos[i].x = 50 + (i % 10) * 60;
+		inimigos[i].x = 50 + (i % 5) * 60;
 		// inimigos na 'coluna'
-		inimigos[i].y = 50 + (i / 10) * 40;
+		inimigos[i].y = 50 + (i / 5) * 40;
 		inimigos[i].vivo = true;
 	}
 
 	return true;
 }
+
+bool carregar_sons(){
+    al_install_audio();
+    al_init_acodec_addon();
+    al_reserve_samples(3);  // Reserva 3 canais de áudio
+
+    musica_fundo = al_load_sample("./sounds/Code Geass R2 - The Master.ogg");
+    som_tiro = al_load_sample("./sounds/laser5.wav");
+    som_explosao = al_load_sample("./sounds/explosion.wav");
+
+    if (!musica_fundo || !som_tiro || !som_explosao) {
+        printf("Erro ao carregar sons!\n");
+        return false;
+    }
+
+    instancia_musica = al_create_sample_instance(musica_fundo);
+    al_set_sample_instance_playmode(instancia_musica, ALLEGRO_PLAYMODE_LOOP);
+    al_attach_sample_instance_to_mixer(instancia_musica, al_get_default_mixer());
+    return true;
+}
+
+void tocar_musica() {
+  if (musica_fundo) {
+        al_play_sample(musica_fundo, 0.3, 0.0, 1.0, ALLEGRO_PLAYMODE_LOOP, NULL);
+    }
+}
+
+void parar_musica() {
+    al_stop_sample_instance(instancia_musica);
+}
+
 
 bool carregar_imagens(){
 	jogador_img = al_load_bitmap("./images/Ship_1.png");
@@ -38,8 +79,7 @@ bool carregar_imagens(){
 	return true;
 }
 
-void desenhar_jogo(Jogador jogador, Inimigo inimigos[], int num_inimigos, Tiro tiros[], int max_tiros){
-
+void desenhar_jogo(Jogador jogador, Inimigo inimigos[], int num_inimigos, Tiro tiros[], int max_tiros, ALLEGRO_FONT *fonte){
 	al_clear_to_color(al_map_rgb(0, 0, 0));
 	
 	al_draw_bitmap(jogador_img,
@@ -65,7 +105,15 @@ void desenhar_jogo(Jogador jogador, Inimigo inimigos[], int num_inimigos, Tiro t
             );
         }
     }
-	al_flip_display();
+	char texto_pontuacao[50];
+    sprintf(texto_pontuacao, "Pontos: %d", jogador.pontuacao);
+    al_draw_text(fonte, al_map_rgb(255, 255, 255), 10, 10, 0, texto_pontuacao);
+
+    char texto_recorde[50];
+    sprintf(texto_recorde, "Recorde: %d", recorde);
+    al_draw_text(fonte, al_map_rgb(255, 255, 255), 10, 30, 0, texto_recorde);
+
+    al_flip_display();
 }
 
 void mover_jogador(Jogador *jogador, int direcao) {
@@ -84,6 +132,7 @@ void atirar(Jogador jogador, Tiro tiros[], int max_tiros) {
             tiros[i].x = jogador.x;
             tiros[i].y = jogador.y - 20;
             tiros[i].ativo = true;
+	    al_play_sample(som_tiro, 1.0, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
             break;
         }
     }
@@ -121,7 +170,7 @@ void atualizar_inimigos(Inimigo inimigos[], int num_inimigos, float *velocidade)
         }
         move_direita = !move_direita;  // Inverte a direção
         deve_descer = false;           // Reseta o flag
-        *velocidade += 0.2f;           // Aumenta a velocidade (dificuldade progressiva)
+        *velocidade += 0.1f;           // Aumenta a velocidade (dificuldade progressiva)
     }
 }
 
@@ -133,8 +182,7 @@ void atualizar_tiros(Tiro tiros[], int max_tiros, float velocidade) {
         }
     }
 }
-
-bool verificar_colisao(Tiro tiros[], Inimigo inimigos[], int num_inimigos, int max_tiros) {
+bool verificar_colisao(Tiro tiros[], Inimigo inimigos[], int num_inimigos, int max_tiros, Jogador *jogador) {
     for (int i = 0; i < num_inimigos; i++) {
         if (inimigos[i].vivo) {
             for (int j = 0; j < max_tiros; j++) {
@@ -146,6 +194,8 @@ bool verificar_colisao(Tiro tiros[], Inimigo inimigos[], int num_inimigos, int m
                     if (distancia < 20) { // Raio de colisão
                         inimigos[i].vivo = false;
                         tiros[j].ativo = false;
+			jogador->pontuacao += 10;
+			al_play_sample(som_explosao, 1.0, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
                         return true;
                     }
                 }
@@ -154,9 +204,40 @@ bool verificar_colisao(Tiro tiros[], Inimigo inimigos[], int num_inimigos, int m
     }
     return false;
 }
+void salvar_recorde() {
+    FILE *arquivo = fopen("recorde.dat", "wb");
+    if (arquivo) {
+        fwrite(&recorde, sizeof(int), 1, arquivo);
+        fclose(arquivo);
+    }
+}
+
+void carregar_recorde() {
+    FILE *arquivo = fopen("recorde.dat", "rb");
+    if (arquivo) {
+        fread(&recorde, sizeof(int), 1, arquivo);
+        fclose(arquivo);
+    }
+}
+void atualizar_recorde(Jogador *jogador) {  // Agora recebe ponteiro
+    if (jogador->pontuacao > recorde) {
+        recorde = jogador->pontuacao;
+        salvar_recorde();  // Salva automaticamente no arquivo
+        printf("Novo recorde: %d!\n", recorde);
+    }
+}
 
 void liberar_imagens() {
     al_destroy_bitmap(jogador_img);
     al_destroy_bitmap(inimigo_img);
+    al_destroy_font(fonte);
 }
 
+void liberar_sons() {
+    al_stop_sample_instance(instancia_musica);
+    al_destroy_sample_instance(instancia_musica);
+    al_destroy_sample(musica_fundo);
+    al_destroy_sample(som_tiro);
+    al_destroy_sample(som_explosao);
+    al_uninstall_audio();
+}

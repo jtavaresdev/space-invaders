@@ -2,15 +2,18 @@
 #include <allegro5/allegro.h>
 #include <allegro5/allegro_primitives.h>
 #include <allegro5/allegro_image.h>
+#include <allegro5/allegro_font.h>
+#include <allegro5/allegro_ttf.h>
 #include <stdbool.h>
 #include <stdio.h>
+
 #define ALTURA_TELA 600
 #define LARGURA_TELA 800
 #define NUM_INIMIGOS 20
 #define MAX_TIROS 10
+#define DISTANCIA_PERTO_NAVE 40
 
 int main() {
-    // Inicializa Allegro e seus addons
     if (!al_init()) {
         fprintf(stderr, "Falha ao inicializar Allegro.\n");
         return -1;
@@ -28,35 +31,50 @@ int main() {
         return -1;
     }
 
-    // Configura display
     ALLEGRO_DISPLAY *display = al_create_display(800, 600);
     if (!display) {
         fprintf(stderr, "Falha ao criar display.\n");
         return -1;
     }
 
-    // Fila de eventos
+    al_init_font_addon();
+    al_init_ttf_addon();
+
+    ALLEGRO_FONT* fonte = NULL;
+
+    fonte = al_load_ttf_font("./font/ARCADECLASSIC.TTF", 24, 0);
+    if (!fonte) {
+        fprintf(stderr, "Falha ao carregar fonte!\n");
+        al_destroy_display(display);
+        return -1;
+    }
+
+     if (!carregar_sons()) {
+        printf("Sons desabilitados\n");
+    } else {
+        tocar_musica();
+    }
+
     ALLEGRO_EVENT_QUEUE *fila_eventos = al_create_event_queue();
     al_register_event_source(fila_eventos, al_get_display_event_source(display));
     al_register_event_source(fila_eventos, al_get_keyboard_event_source());
-
-    // Carrega imagens
+    carregar_recorde();
     if (!carregar_imagens()) {
         al_destroy_display(display);
         return -1;
     }
 
-    // Variáveis do jogo
+
+
     Jogador jogador;
     Inimigo inimigos[NUM_INIMIGOS];
     Tiro tiros[MAX_TIROS] = {0};
-    float velocidade_inimigos = 1.0f;
+    float velocidade_inimigos = 1.5f;
     bool sair = false;
     bool tecla[2] = {false, false}; // [0] = esquerda, [1] = direita
 
     inicializar_jogo(&jogador, inimigos, NUM_INIMIGOS);
 
-    // Loop principal
     while (!sair) {
         ALLEGRO_EVENT evento;
         while (al_get_next_event(fila_eventos, &evento)) {
@@ -77,34 +95,37 @@ int main() {
             }
         }
 
-        // Movimento do jogador
         if (tecla[0]) mover_jogador(&jogador, -1);
         if (tecla[1]) mover_jogador(&jogador, 1);
 
-        // Atualiza lógica do jogo
         atualizar_inimigos(inimigos, NUM_INIMIGOS, &velocidade_inimigos);
         atualizar_tiros(tiros, MAX_TIROS, 5.0f);
-        verificar_colisao(tiros, inimigos, NUM_INIMIGOS, MAX_TIROS);
+        verificar_colisao(tiros, inimigos, NUM_INIMIGOS, MAX_TIROS, &jogador);
+	atualizar_recorde(&jogador);
 
-        // Renderização
-        desenhar_jogo(jogador, inimigos, NUM_INIMIGOS, tiros, MAX_TIROS);
-
-        // Game Over se inimigos chegarem perto
-        for (int i = 0; i < NUM_INIMIGOS; i++) {
-            if (inimigos[i].vivo && inimigos[i].y > ALTURA_TELA - 60) {
-                printf("GAME OVER! Inimigos invadiram!\n");
-                sair = true;
-                break;
-            }
+        desenhar_jogo(jogador, inimigos, NUM_INIMIGOS, tiros, MAX_TIROS, fonte);
+	for (int i = 0; i < NUM_INIMIGOS; i++) {
+    if (inimigos[i].vivo) {
+        bool inimigo_no_final = (inimigos[i].y > ALTURA_TELA - 60);
+        bool inimigo_perto = (inimigos[i].y > jogador.y - DISTANCIA_PERTO_NAVE);
+        if (inimigo_no_final || inimigo_perto) {
+            printf("GAME OVER! Inimigos invadiram sua base!\n");
+            sair = true;
+            break;
         }
+    }
+} 
 
         al_rest(0.016); // ~60 FPS
     }
 
-    // Libera recursos
+    parar_musica();
+    liberar_sons();
+    atualizar_recorde(&jogador);
     liberar_imagens();
     al_destroy_event_queue(fila_eventos);
     al_destroy_display(display);
+    al_destroy_font(fonte);
 
     return 0;
 }

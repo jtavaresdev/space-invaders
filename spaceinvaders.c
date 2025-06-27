@@ -40,7 +40,7 @@ bool inicializar_jogo(Jogador *jogador, Inimigo inimigos[], int num_inimigos){
 bool carregar_sons(){
     al_install_audio();
     al_init_acodec_addon();
-    al_reserve_samples(3);  // Reserva 3 canais de áudio
+    al_reserve_samples(3); 
 
     musica_fundo = al_load_sample("./sounds/Code Geass R2 - The Master.ogg");
     som_tiro = al_load_sample("./sounds/laser5.wav");
@@ -140,20 +140,18 @@ void atirar(Jogador jogador, Tiro tiros[], int max_tiros) {
 
 void atualizar_inimigos(Inimigo inimigos[], int num_inimigos, float *velocidade){
     static bool move_direita = true;
-    static bool deve_descer = false;  // Controla quando os inimigos devem descer
+    static bool deve_descer = false;  
     float nova_velocidade = *velocidade;
 
     for (int i = 0; i < num_inimigos; i++) {
         if (inimigos[i].vivo) {
             if (move_direita) {
                 inimigos[i].x += nova_velocidade;
-                // Verifica se algum inimigo atingiu a borda direita
                 if (inimigos[i].x > LARGURA_TELA - 30) {
                     deve_descer = true;
                 }
             } else {
                 inimigos[i].x -= nova_velocidade;
-                // Verifica se algum inimigo atingiu a borda esquerda
                 if (inimigos[i].x < 30) {
                     deve_descer = true;
                 }
@@ -161,16 +159,15 @@ void atualizar_inimigos(Inimigo inimigos[], int num_inimigos, float *velocidade)
         }
     }
 
-    // Se os inimigos devem descer
     if (deve_descer) {
         for (int i = 0; i < num_inimigos; i++) {
             if (inimigos[i].vivo) {
-                inimigos[i].y += 20;  // Desce 20 pixels
+                inimigos[i].y += 20;  
             }
         }
-        move_direita = !move_direita;  // Inverte a direção
-        deve_descer = false;           // Reseta o flag
-        *velocidade += 0.1f;           // Aumenta a velocidade (dificuldade progressiva)
+        move_direita = !move_direita;  
+        deve_descer = false;           
+        *velocidade += 0.1f;         
     }
 }
 
@@ -191,7 +188,7 @@ bool verificar_colisao(Tiro tiros[], Inimigo inimigos[], int num_inimigos, int m
                     float dy = tiros[j].y - inimigos[i].y;
                     float distancia = sqrt(dx * dx + dy * dy);
 
-                    if (distancia < 20) { // Raio de colisão
+                    if (distancia < 20) { 
                         inimigos[i].vivo = false;
                         tiros[j].ativo = false;
 			jogador->pontuacao += 10;
@@ -219,10 +216,10 @@ void carregar_recorde() {
         fclose(arquivo);
     }
 }
-void atualizar_recorde(Jogador *jogador) {  // Agora recebe ponteiro
+void atualizar_recorde(Jogador *jogador) {  
     if (jogador->pontuacao > recorde) {
         recorde = jogador->pontuacao;
-        salvar_recorde();  // Salva automaticamente no arquivo
+        salvar_recorde();  
         printf("Novo recorde: %d!\n", recorde);
     }
 }

@@ -1,4 +1,3 @@
-#ifndef SPACEINVADERS_H
 #define SPACEINVADERS_H
 
 #include <allegro5/allegro.h>
@@ -47,4 +46,3 @@ bool carregar_sons();
 void tocar_musica();
 void parar_musica();
 void liberar_sons();
-#endif
